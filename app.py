@@ -6,7 +6,7 @@ import streamlit as st
 def has_cloud_config() -> bool:
     try:
         url = st.secrets.get("SUPABASE_URL", os.environ.get("SUPABASE_URL", ""))
-        key = (st.secrets.get("SUPABASE_PUBLISHABLE_KEY", "") or
+        key = (st.secrets.get("SUPABASE_PUBLISHABLE_KEY", os.environ.get("SUPABASE_PUBLISHABLE_KEY", "")) or
                st.secrets.get("SUPABASE_ANON_KEY", os.environ.get("SUPABASE_ANON_KEY", "")))
         return bool(url and key)
     except Exception:
