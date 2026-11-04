@@ -137,6 +137,15 @@ def interview_info(token: str) -> dict[str, str]:
     session = load_session(token)
     return {"status": session["status"], "channel": "browser_voice"}
 
+@app.post("/api/interview/{token}/notice")
+def acknowledge_notice(token: str) -> dict[str, str]:
+    session = load_session(token)
+    db().table("interview_sessions").update({
+        "candidate_notice_version": "v1",
+        "candidate_notice_accepted_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", session["id"]).execute()
+    return {"status": "acknowledged"}
+
 
 @app.websocket("/ws/interview/{token}")
 async def interview_socket(websocket: WebSocket, token: str) -> None:
