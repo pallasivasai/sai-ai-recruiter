@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from supabase import Client, create_client
@@ -76,7 +76,7 @@ def health() -> dict[str, str]:
 
 
 @app.post("/api/invites")
-def create_invite(payload: InviteRequest, x_internal_api_key: str | None = None) -> dict[str, str]:
+def create_invite(payload: InviteRequest, x_internal_api_key: str | None = Header(default=None, alias="X-Internal-API-Key")) -> dict[str, str]:
     expected = os.environ.get("VOICE_INTERNAL_API_KEY", "")
     if not expected or not x_internal_api_key or not secrets.compare_digest(expected, x_internal_api_key):
         raise HTTPException(status_code=401, detail="Unauthorized")
