@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SAI AI Recruiter · Candidate Interview</title>
+<style>
+:root{font-family:Inter,system-ui,sans-serif;color:#172033;background:#f4f6fb}*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px}
+main{width:min(720px,100%);background:white;border:1px solid #e4e8f0;border-radius:24px;padding:clamp(22px,5vw,42px);box-shadow:0 18px 60px #1b2b4a12}
+.brand{font-size:13px;letter-spacing:.12em;font-weight:800;color:#53627b}.orb{width:86px;height:86px;border-radius:50%;display:grid;place-items:center;background:#e9efff;color:#3157bb;font-size:34px;margin:28px auto 18px}
+h1{text-align:center;font-size:clamp(25px,5vw,34px);margin:0}.sub{text-align:center;color:#69758b;line-height:1.6}
+.panel{background:#f7f8fc;border:1px solid #e8ebf2;border-radius:16px;padding:18px;margin:24px 0;min-height:100px;line-height:1.6}
+.actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+button{border:0;border-radius:12px;padding:13px 20px;font-weight:700;cursor:pointer;background:#243b75;color:white}
+button.secondary{background:#edf0f6;color:#26334b}button:disabled{opacity:.45;cursor:not-allowed}
+.status{text-align:center;color:#68758b;font-size:13px;margin-top:18px}.notice{font-size:12px;color:#7a8496;line-height:1.6;margin-top:24px}
+</style>
+</head>
+<body><main>
+<div class="brand">SAI AI RECRUITER</div>
+<div class="orb" id="orb">🎙️</div>
+<h1>AI Voice Interview</h1>
+<p class="sub">Speak naturally. The interviewer will ask one question at a time.</p>
+<div class="panel" id="dialogue">Preparing your interview link…</div>
+<div class="actions">
+<button id="start" disabled>Start interview</button>
+<button class="secondary" id="stop" disabled>End interview</button>
+</div>
+<div class="status" id="status">Checking interview link…</div>
+<p class="notice">Your microphone is used only after you press Start and grant permission. This page does not record or upload raw audio. Speech recognition availability and processing depend on your browser. Your spoken answers are converted to text and saved as interview transcript. Please do not share passwords, bank details or unrelated sensitive information.</p>
+</main>
+<script>
+const params=new URLSearchParams(location.search),token=params.get("token");
+const dialogue=document.getElementById("dialogue"),statusEl=document.getElementById("status");
+const startBtn=document.getElementById("start"),stopBtn=document.getElementById("stop"),orb=document.getElementById("orb");
+let socket,recognition,running=false,finalText="";
+const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+function say(text){dialogue.textContent=text;if("speechSynthesis" in window){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.rate=1;speechSynthesis.speak(u)}}
+function connect(){return new Promise((resolve,reject)=>{const scheme=location.protocol==="https:"?"wss":"ws";socket=new WebSocket(scheme+"://"+location.host+"/ws/interview/"+encodeURIComponent(token));socket.onopen=resolve;socket.onerror=reject;socket.onmessage=e=>{const data=JSON.parse(e.data);if(data.type==="ready"){say(data.message);statusEl.textContent="Connected · Waiting for you to start speaking"}else if(data.type==="assistant_text"){say(data.message);statusEl.textContent="AI interviewer is speaking"}else if(data.type==="error"){statusEl.textContent=data.message;stop()}}})}
+function listen(){if(!running||!recognition)return;try{recognition.start()}catch(e){}}
+function setupRecognition(){recognition=new SpeechRecognition();recognition.lang=navigator.language||"en-US";recognition.continuous=true;recognition.interimResults=true;recognition.onresult=e=>{let interim="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)finalText+=t+" ";else interim+=t}if(interim)statusEl.textContent="Listening: "+interim;if(finalText.trim()){const text=finalText.trim();finalText="";if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify({type:"candidate_text",text}));statusEl.textContent="Answer sent · Waiting for the next question"}};recognition.onerror=e=>{statusEl.textContent="Speech recognition: "+e.error};recognition.onend=()=>{if(running)setTimeout(listen,350)}}
+async function start(){if(!token){statusEl.textContent="This interview link is missing its token.";return}if(!SpeechRecognition){statusEl.textContent="Your browser does not support speech recognition. Please try the latest Chrome or Edge.";return}try{startBtn.disabled=true;await connect();setupRecognition();running=true;recognition.start();stopBtn.disabled=false;orb.textContent="🟢";statusEl.textContent="Listening · Speak after the AI finishes"}catch(e){statusEl.textContent="Could not connect. Check your internet and try again.";startBtn.disabled=false}}
+function stop(){running=false;try{recognition?.stop()}catch(e){}try{socket?.close()}catch(e){}speechSynthesis?.cancel();stopBtn.disabled=true;startBtn.disabled=false;orb.textContent="🎙️";statusEl.textContent="Interview session disconnected"}
+startBtn.onclick=start;stopBtn.onclick=stop;
+if(!token){dialogue.textContent="This interview link is incomplete. Please contact your recruiter.";statusEl.textContent="Invalid interview link"}else fetch("/api/interview/"+encodeURIComponent(token)).then(r=>{if(!r.ok)throw Error();return r.json()}).then(()=>{dialogue.textContent="Your interview is ready. Press Start when you are comfortable.";statusEl.textContent="Ready · Microphone permission will be requested after you start";startBtn.disabled=false}).catch(()=>{dialogue.textContent="This interview link is invalid or has expired. Please contact your recruiter.";statusEl.textContent="Link unavailable"})
+</script></body></html>
